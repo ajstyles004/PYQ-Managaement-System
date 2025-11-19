@@ -11,19 +11,35 @@ This project provides a centralized repository for storing and retrieving previo
 - **Semester**
 - **Exam Type** (Mid-term, End-semester, etc.)
 
-The system features both a **public search interface** and an **admin management panel** for uploading and organizing papers.
+The system features both a **student interface** and an **admin management panel** for uploading and organizing papers, with role-based authentication and access control.
 
 ---
 
 ## Features
 
-### Public Interface (index.php)
+### Role-Based Access Control
+- **Student Account** - Register/login to view and download papers (read-only access)
+- **Admin Account** - Manage all content and system administration
+- **Session Management** - Secure session handling with password hashing
+- **Access Protection** - APIs and pages require proper authentication
+
+### Student Interface (student_dashboard.php)
 - **Search & Filter Papers**
   - Filter by department, year, and title keywords
   - View available papers in a responsive table
   - Download/open papers in a new tab
+- **Student Profile** - View account details and activity
 - **Responsive Design** - Built with Bootstrap 5.3
 - **Clean User Experience** - Minimal clutter, focus on finding papers
+
+### Authentication Pages
+- **choose_role.php** - Landing page to select Student or Admin role
+- **student_login.php** - Student login with redirect support
+- **student_register.php** - New student registration
+- **student_profile.php** - View/manage student profile
+- **admin_login.php** - Admin login with redirect support
+- **admin_logout.php** - Logout endpoint
+- **student_logout.php** - Logout endpoint
 
 ### Admin Panel (manage.php)
 - **Department Management**
@@ -40,13 +56,14 @@ The system features both a **public search interface** and an **admin management
   - Filter papers by department/subject
 - **Drag-and-Drop Upload** - Simple file upload with progress tracking
 - **Quick Subject Creation** - Add new subjects on-the-fly during paper upload
+- **Protected Access** - Admin-only pages with authentication checks
 
-### Backend APIs
-- **paper_api.php** - CRUD operations for papers (list, get, update, delete)
-- **subject_api.php** - CRUD operations for subjects
-- **dept_api.php** - CRUD operations for departments
+### Backend APIs (Protected)
+- **paper_api.php** - CRUD operations for papers (requires auth)
+- **subject_api.php** - CRUD operations for subjects (requires auth)
+- **dept_api.php** - CRUD operations for departments (requires auth)
 - **upload_ajax.php** - Handles paper file uploads with progress tracking
-- **api_list.php** - Search/filter papers (used by public interface)
+- **api_list.php** - Search/filter papers (public or authenticated)
 - **get_subjects.php** - Fetch subjects by department
 - **download.php** - Secure paper download endpoint
 
@@ -97,8 +114,9 @@ $DB_PASS = '';               // MySQL password (empty if none)
 ### Step 5: Launch Application
 Open your browser and go to:
 ```
-http://localhost/question_bank/index.php
+http://localhost/question_bank/choose_role.php
 ```
+This will take you to the role selection page where you can choose to login as a Student or Admin.
 
 ---
 
@@ -106,18 +124,30 @@ http://localhost/question_bank/index.php
 
 ```
 question_bank/
-├── index.php              # Public search interface
+├── choose_role.php        # Role selection landing page
+├── student_login.php      # Student login page
+├── student_register.php   # Student registration page
+├── student_dashboard.php  # Student search & download interface
+├── student_profile.php    # Student profile page
+├── student_auth.php       # Student session helpers
+├── student_logout.php     # Student logout endpoint
+├── admin_login.php        # Admin login page
+├── admin_auth.php         # Admin session helpers
+├── admin_logout.php       # Admin logout endpoint
+├── create_admin.php       # Admin account creation utility
+├── create_user.php        # User account creation utility
 ├── manage.php             # Admin panel (departments, subjects, papers)
+├── index.php              # Public search interface (legacy)
 ├── db.php                 # Database connection configuration
-├── api_list.php           # API for searching papers (public)
+├── api_list.php           # API for searching papers
 ├── paper_api.php          # API for paper CRUD operations
 ├── subject_api.php        # API for subject CRUD operations
 ├── dept_api.php           # API for department CRUD operations
 ├── get_subjects.php       # API to fetch subjects by department
 ├── upload_ajax.php        # API for handling file uploads
 ├── download.php           # Secure download endpoint
-├── upload.php             # Legacy upload page (optional)
-├── list.php               # Legacy papers listing (optional)
+├── upload.php             # Legacy upload page
+├── list.php               # Legacy papers listing
 ├── schema.sql             # Database schema & initial data
 ├── css/
 │   └── style.css          # Custom styles
@@ -152,6 +182,16 @@ Stores information about who uploaded papers (optional for tracking).
 Stores course information (currently optional).
 - **Fields:** course_id (PK), course_name, duration
 
+#### `admin_user` (NEW)
+Stores admin account credentials for site administration.
+- **Fields:** admin_id (PK), username (UNIQUE), password_hash, created_at
+- **Note:** Use `create_admin.php` to create admin accounts securely
+
+#### `student_user` (NEW)
+Stores student account credentials for read-only access.
+- **Fields:** student_id (PK), username (UNIQUE), full_name, password_hash, created_at
+- **Note:** Students can self-register or use `create_user.php` to create accounts
+
 ### Pre-populated Data
 The schema includes 13 JIS University departments:
 - Faculty of Engineering & Technology
@@ -168,35 +208,55 @@ The schema includes 13 JIS University departments:
 
 ### For Students (Public Users)
 
-1. **Search Papers:**
-   - Go to `http://localhost/question_bank/index.php`
+1. **Register or Login:**
+   - Go to `http://localhost/question_bank/choose_role.php`
+   - Click **I am a Student**
+   - New users: Click **Register** to create a student account
+   - Existing users: Login with username and password
+
+2. **Search Papers (Student Dashboard):**
+   - After login, you're on the student dashboard
    - Select a **Department** from the dropdown
    - (Optional) Enter a **Year** (e.g., 2022)
    - (Optional) Search by **Title** keyword (e.g., "DBMS")
    - Click **Go** to filter results
 
-2. **Download Papers:**
+3. **Download Papers:**
    - Click the **Open** button in the File column
    - Paper opens in a new tab
    - Use browser download functionality if needed
 
+4. **View Profile:**
+   - Click **Profile** (if available in student dashboard)
+   - View account details and registration date
+
 ### For Administrators (Admin Panel)
 
 1. **Access Admin Panel:**
-   - Click **Admin Panel** button on the home page
+   - Go to `http://localhost/question_bank/choose_role.php`
+   - Click **I am an Admin**
+   - Login with admin credentials
    - Or go directly to `http://localhost/question_bank/manage.php`
 
-2. **Manage Departments:**
+2. **Create First Admin Account:**
+   - If no admin exists yet, use `create_admin.php`:
+   ```
+   http://localhost/question_bank/create_admin.php
+   ```
+   - Enter username and password
+   - This creates the initial admin account
+
+3. **Manage Departments:**
    - **Add:** Click **+ Add Department**
    - **Edit:** Click **Edit** next to a department
    - **Delete:** Click **Delete** (cascades to subjects and papers)
 
-3. **Manage Subjects:**
+4. **Manage Subjects:**
    - **Add:** Click **+ Add Subject**, select department, enter details
    - **Filter:** Use the department dropdown to filter subjects
    - **Edit/Delete:** Use action buttons in the table
 
-4. **Upload Papers:**
+5. **Upload Papers:**
    - Click **+ Upload New Paper** button
    - Fill in form:
      - **Title** (e.g., "DBMS - End Sem 2020")
@@ -209,16 +269,19 @@ The schema includes 13 JIS University departments:
    - Click **Upload Paper**
    - Progress bar shows upload status
 
-5. **Edit Papers:**
+6. **Edit Papers:**
    - Click **Edit** next to a paper in the Papers table
    - Modify metadata (title, year, subject, etc.)
    - Optionally upload a replacement PDF
    - Click **Save Paper**
 
-6. **Delete Papers:**
+7. **Delete Papers:**
    - Click **Delete** next to a paper
    - Confirm deletion
    - Paper and associated file are removed
+
+8. **Logout:**
+   - Click **Logout** to end admin session
 
 ### Quick Subject Creation During Upload
 - While uploading a paper, if the needed subject doesn't exist:
@@ -285,23 +348,37 @@ Response: JSON array of departments
 
 ## Security Features
 
+- **Password Hashing:** Admin and student passwords hashed using PHP `password_hash()` (bcrypt)
+- **Session Management:** Secure session handling with session regeneration on login
 - **Input Validation:** All user inputs are validated (integers, strings trimmed)
 - **SQL Injection Prevention:** Prepared statements with parameterized queries
 - **File Type Checking:** MIME type validation for PDF uploads
 - **Random File Naming:** Uploaded files renamed with timestamp + random bytes
 - **HTML Escaping:** XSS prevention in frontend JavaScript
-- **No Admin Authentication:** ⚠️ (Optional: Add login system for production)
+- **Authentication Required:** Admin APIs and pages require valid login
+- **Logout Security:** Proper session destruction on logout
+- **Access Control:** Students can only view papers, cannot modify content
 
-### ⚠️ Production Considerations
+### Authentication Flow
+1. User selects role (Student/Admin) on `choose_role.php`
+2. Redirects to login page (`student_login.php` or `admin_login.php`)
+3. Credentials verified against database
+4. Session established with regenerated ID
+5. User redirected to dashboard/panel or original requested page
+6. Protected pages check session before allowing access
+
+### Production Recommendations
 
 For production deployment, consider:
-1. **Add Admin Authentication** - Implement session-based login for admin panel
-2. **Move uploads folder** - Store uploads outside webroot for better security
-3. **File Size Limits** - Set appropriate max upload sizes in PHP config
-4. **Rate Limiting** - Prevent abuse of upload/delete endpoints
-5. **Backup Strategy** - Regular database and file backups
-6. **HTTPS** - Use SSL/TLS in production
-7. **Access Control** - Restrict admin panel by IP or authentication
+1. **HTTPS Only** - Use SSL/TLS encryption
+2. **Rate Limiting** - Prevent brute-force login attempts
+3. **Move uploads folder** - Store uploads outside webroot for better security
+4. **File Size Limits** - Set appropriate max upload sizes in PHP config
+5. **IP Whitelisting** - Restrict admin panel access by IP if possible
+6. **Backup Strategy** - Regular database and file backups
+7. **Monitoring** - Log admin actions and suspicious activities
+8. **CSRF Protection** - Add CSRF tokens to sensitive forms
+9. **Update PHP/MySQL** - Keep all software versions current
 
 ---
 
@@ -396,7 +473,8 @@ For issues or feature requests:
 
 ## Version History
 
-- **v1.0** - Initial release with basic paper upload/download, department/subject management, and admin panel
+- **v1.0** - Initial release with basic paper upload/download, department/subject management
+- **v1.1** - Added role-based authentication system with student and admin accounts, session management, and access control
 
 ---
 

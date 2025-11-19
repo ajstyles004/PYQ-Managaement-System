@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <input name="password" type="password" class="form-control" required></div>
             <div class="d-flex justify-content-between align-items-center">
               <button class="btn btn-primary" type="submit">Login</button>
-              <a class="btn btn-link" href="index.php">Back to site</a>
+              <a class="btn btn-link" href="choose_role.php">Back to site</a>
             </div>
           </form>
         </div>
