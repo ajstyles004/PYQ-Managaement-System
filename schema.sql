@@ -63,3 +63,25 @@ INSERT INTO department (department_code, department_name) VALUES
 ('CHEM', 'Faculty of Chemistry'),
 ('JIASR','JIS Institute of Advanced Studies & Research'),
 ('MED',  'School of Medical Science & Research');
+
+-- Admin users table for site administration
+CREATE TABLE IF NOT EXISTS admin_user (
+  admin_id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- To create an initial admin user, either:
+-- 1) Use the provided `create_admin.php` script in the project root (recommended),
+-- 2) Or generate a password hash in PHP: `<?php echo password_hash('yourpassword', PASSWORD_DEFAULT); ?>`
+--    and insert using SQL: INSERT INTO admin_user (username, password_hash) VALUES ('admin', '<hash>');
+
+-- Students table for read-only student accounts
+CREATE TABLE IF NOT EXISTS student_user (
+  student_id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  full_name VARCHAR(150) DEFAULT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

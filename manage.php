@@ -2,6 +2,9 @@
 // manage.php - Departments, Subjects & Papers (Admin UI) with Upload integrated
 // Assumes: db.php, dept_api.php, subject_api.php, paper_api.php, get_subjects.php, upload_ajax.php exist.
 require 'db.php';
+// Admin authentication
+require_once 'admin_auth.php';
+ensure_admin();
 
 // load departments for initial selects
 $departments = [];
@@ -27,8 +30,20 @@ while ($r = $res->fetch_assoc()) $departments[] = $r;
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Admin: Manage Departments, Subjects & Papers</h2>
     <div>
+      <?php if (session_status() === PHP_SESSION_NONE) session_start(); ?>
+      <span class="me-2 small-muted">Logged in as: <strong><?php echo htmlspecialchars($_SESSION['admin_username'] ?? ''); ?></strong></span>
+      <a class="btn btn-sm btn-outline-primary me-2" href="create_admin.php">Create Admin</a>
+      <a class="btn btn-sm btn-outline-primary me-2" href="create_user.php">Create User</a>
+      <a class="btn btn-outline-danger me-2" href="admin_logout.php">Logout</a>
       <a class="btn btn-outline-secondary" href="index.php">Back to Site</a>
     </div>
+  </div>
+
+  <!-- Prominent actions (visible) -->
+  <div class="mb-3">
+    <a class="btn btn-primary me-2" href="create_admin.php">Create Admin</a>
+    <a class="btn btn-success me-2" href="create_user.php">Create User</a>
+    <a class="btn btn-danger" href="admin_logout.php">Logout</a>
   </div>
 
   <!-- Departments -->
