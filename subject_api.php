@@ -13,6 +13,12 @@ function jsonErr($msg, $code = 400) {
 
 $action = $_REQUEST['action'] ?? 'list';
 
+// Protect non-public actions
+if (!in_array($action, ['list','get'])) {
+    require_once 'admin_auth.php';
+    ensure_admin();
+}
+
 try {
 
     if ($action === 'list') {

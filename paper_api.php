@@ -5,6 +5,12 @@ header('Content-Type: application/json; charset=utf-8');
 
 $action = $_REQUEST['action'] ?? 'list';
 
+// Protect non-public actions (modifications)
+if (!in_array($action, ['list','get'])) {
+    require_once 'admin_auth.php';
+    ensure_admin();
+}
+
 try {
     // LIST - optionally filter by subject_id or department_id
     if ($action === 'list') {

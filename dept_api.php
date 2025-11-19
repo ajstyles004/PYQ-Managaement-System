@@ -5,6 +5,12 @@ header('Content-Type: application/json; charset=utf-8');
 
 $action = $_REQUEST['action'] ?? 'list';
 
+// Protect non-public actions
+if (!in_array($action, ['list','get'])) {
+    require_once 'admin_auth.php';
+    ensure_admin();
+}
+
 if ($action === 'list') {
     $res = $mysqli->query("SELECT department_id, department_code, department_name FROM department ORDER BY department_name");
     $out = [];

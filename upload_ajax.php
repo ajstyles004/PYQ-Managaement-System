@@ -3,6 +3,10 @@
 require 'db.php';
 header('Content-Type: application/json; charset=utf-8');
 
+// upload is an admin action
+require_once 'admin_auth.php';
+ensure_admin();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success'=>false,'error'=>'Method not allowed']);
     exit;
