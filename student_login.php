@@ -13,6 +13,13 @@ $message = '';
 $step = isset($_SESSION['login_step']) ? $_SESSION['login_step'] : 1;  // Step 1: Email+Password, Step 2: OTP
 $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'student_dashboard.php';
 
+// Store redirect in session for persistence across steps
+if (!isset($_SESSION['login_redirect'])) {
+    $_SESSION['login_redirect'] = $redirect;
+} else {
+    $redirect = $_SESSION['login_redirect'];
+}
+
 // Check if user just registered
 if (isset($_GET['registered'])) {
     $message = 'Registration successful! Your email is verified. You can now login.';
@@ -124,12 +131,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Create session
                     login_student_session($username, $student_id);
                     
+                    // Get redirect from session
+                    $final_redirect = isset($_SESSION['login_redirect']) ? $_SESSION['login_redirect'] : 'student_dashboard.php';
+                    
                     // Clear login session data
-                    unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id']);
+                    unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id'], $_SESSION['login_redirect']);
                     
                     // Clear output buffer and redirect
                     ob_end_clean();
-                    header('Location: ' . $redirect);
+                    header('Location: ' . $final_redirect);
                     exit;
                 }
             } else {

@@ -124,6 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 unset($_SESSION['register_step'], $_SESSION['register_email'], $_SESSION['register_student_id']);
                 
                 // Redirect to login page
+                ob_end_clean();
                 header('Location: student_login.php?registered=1');
                 exit;
             } else {
@@ -178,6 +179,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'resend_otp') {
         }
     }
 }
+
+// Close output buffering
+ob_end_clean();
 ?>
 <!doctype html>
 <html lang="en">
