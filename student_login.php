@@ -132,11 +132,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $username = $row ? $row['username'] : "student_$student_id";
                     
-                    // Create session
+                    // Create session - this sets student_logged_in flag
                     login_student_session($username, $student_id);
                     
                     // Get redirect from session
                     $final_redirect = isset($_SESSION['login_redirect']) ? $_SESSION['login_redirect'] : 'student_dashboard.php';
+                    
+                    // Log for debugging
+                    error_log("Login successful: user=$username, redirecting to=$final_redirect");
                     
                     // Clear login session data
                     unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id'], $_SESSION['login_redirect']);
