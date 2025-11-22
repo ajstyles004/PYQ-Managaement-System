@@ -11,13 +11,16 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $error = '';
 $message = '';
 $step = isset($_SESSION['login_step']) ? $_SESSION['login_step'] : 1;  // Step 1: Email+Password, Step 2: OTP
-$redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'student_dashboard.php';
 
-// Store redirect in session for persistence across steps
-if (!isset($_SESSION['login_redirect'])) {
-    $_SESSION['login_redirect'] = $redirect;
-} else {
+// Determine redirect target - use GET param if provided, otherwise use session, otherwise default
+if (isset($_GET['redirect'])) {
+    $redirect = $_GET['redirect'];
+    $_SESSION['login_redirect'] = $redirect;  // Store in session
+} elseif (isset($_SESSION['login_redirect'])) {
     $redirect = $_SESSION['login_redirect'];
+} else {
+    $redirect = 'student_dashboard.php';
+    $_SESSION['login_redirect'] = $redirect;
 }
 
 // Check if user just registered
@@ -85,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_SESSION['login_step'] = 2;
                             $_SESSION['login_email'] = $email;
                             $_SESSION['login_student_id'] = $row['student_id'];
+                            // redirect is already stored in session from initial page load
                             $message = 'OTP sent to your email. Please enter it to complete login.';
                             $step = 2;
                         } else {
