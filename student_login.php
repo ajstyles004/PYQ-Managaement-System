@@ -10,6 +10,11 @@ $message = '';
 $step = isset($_SESSION['login_step']) ? $_SESSION['login_step'] : 1;  // Step 1: Email+Password, Step 2: OTP
 $redirect = isset($_GET['redirect']) ? $_GET['redirect'] : 'student_dashboard.php';
 
+// Check if user just registered
+if (isset($_GET['registered'])) {
+    $message = 'Registration successful! Your email is verified. You can now login.';
+}
+
 // Ensure student_user table has new columns
 $createSql = "CREATE TABLE IF NOT EXISTS student_user (
   student_id INT AUTO_INCREMENT PRIMARY KEY,

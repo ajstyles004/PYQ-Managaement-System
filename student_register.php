@@ -119,11 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($verify_result['verified']) {
                 // Clear registration session data
                 unset($_SESSION['register_step'], $_SESSION['register_email'], $_SESSION['register_student_id']);
-                $message = 'Email verified! Your account is active. You can now login.';
-                $step = 3;  // Success step
                 
-                // Auto-redirect after 3 seconds
-                header('Refresh: 3; url=student_login.php');
+                // Redirect to login page
+                header('Location: student_login.php?registered=1');
+                exit;
             } else {
                 $error = $verify_result['message'];
             }
@@ -247,24 +246,6 @@ if (isset($_SESSION['register_step'])) {
               <a href="student_register.php" class="btn btn-link btn-sm">← Back to Registration</a>
             </div>
           </form>
-          <?php endif; ?>
-          
-          <!-- Step 3: Success -->
-          <?php if ($step === 3): ?>
-          <div class="text-center py-4">
-            <div style="font-size: 3rem; color: #28a745; margin-bottom: 20px;">✓</div>
-            <h4>Email Verified!</h4>
-            <p>Your account is ready to use.</p>
-            <div class="alert alert-success mb-3">
-              <strong>Success!</strong> Redirecting to login page in 3 seconds...
-            </div>
-            <a href="student_login.php" class="btn btn-primary btn-lg">Go to Login Now</a>
-            <script>
-              setTimeout(function() {
-                window.location.href = 'student_login.php';
-              }, 3000);
-            </script>
-          </div>
           <?php endif; ?>
           
         </div>
