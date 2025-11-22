@@ -121,7 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $verify_result = verify_otp($email, $otp);
             
             if ($verify_result['verified']) {
-                // Get student username for session
+                // Get student username for session (it might be NULL, so we use fallback)
+                $username = "student_" . $student_id;  // Default fallback
+                
                 $stmt = $mysqli->prepare('SELECT username FROM student_user WHERE student_id = ? LIMIT 1');
                 if ($stmt) {
                     $stmt->bind_param('i', $student_id);
@@ -130,25 +132,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $row = $res->fetch_assoc();
                     $stmt->close();
                     
-                    $username = $row ? $row['username'] : "student_$student_id";
-                    
-                    // Create session - this sets student_logged_in flag
-                    login_student_session($username, $student_id);
-                    
-                    // Get redirect from session
-                    $final_redirect = isset($_SESSION['login_redirect']) ? $_SESSION['login_redirect'] : 'student_dashboard.php';
-                    
-                    // Log for debugging
-                    error_log("Login successful: user=$username, redirecting to=$final_redirect");
-                    
-                    // Clear login session data
-                    unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id'], $_SESSION['login_redirect']);
-                    
-                    // Clear output buffer and redirect
-                    ob_end_clean();
-                    header('Location: ' . $final_redirect);
-                    exit;
+                    // Use database username if it exists, otherwise use fallback
+                    if ($row && !empty($row['username'])) {
+                        $username = $row['username'];
+                    }
                 }
+                
+                // Create session - this sets student_logged_in flag
+                login_student_session($username, $student_id);
+                
+                // Get redirect from session
+                $final_redirect = isset($_SESSION['login_redirect']) ? $_SESSION['login_redirect'] : 'student_dashboard.php';
+                
+                // Log for debugging
+                error_log("Login successful: student_id=$student_id, username=$username, redirecting to=$final_redirect");
+                
+                // Clear login session data
+                unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id'], $_SESSION['login_redirect']);
+                
+                // Clear output buffer and redirect
+                ob_end_clean();
+                header('Location: ' . $final_redirect);
+                exit;
             } else {
                 $error = $verify_result['message'];
             }
