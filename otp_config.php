@@ -58,111 +58,125 @@ function send_otp_via_stream_socket($email, $otp) {
         $from = SENDER_EMAIL;
         $fromName = SENDER_NAME;
         
-        // Create SMTP connection
-        $fp = @fsockopen('ssl://' . $host, $port, $errno, $errstr, 30);
+        // Create connection to SMTP server (Gmail)
+        $socket = fsockopen($host, $port, $errno, $errstr, 30);
         
-        if (!$fp) {
-            // Try without SSL if SSL fails
-            $fp = @fsockopen($host, $port, $errno, $errstr, 30);
-            if (!$fp) {
-                return ['success' => false, 'message' => "Failed to connect to SMTP: $errstr"];
-            }
+        if (!$socket) {
+            return ['success' => false, 'message' => "SMTP connection failed: $errstr ($errno)"];
         }
         
-        // Helper function to send SMTP command
-        function smtp_send_command($fp, $cmd) {
-            fputs($fp, $cmd . "\r\n");
-            $response = fgets($fp, 1024);
-            return $response;
+        // Read SMTP greeting
+        $response = fgets($socket, 1024);
+        if (strpos($response, '220') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'SMTP server did not respond correctly'];
         }
         
-        // Read server greeting
-        $greeting = fgets($fp, 1024);
+        // Send EHLO
+        fputs($socket, "EHLO localhost\r\n");
+        $response = fgets($socket, 1024);
         
-        // EHLO
-        $resp = smtp_send_command($fp, 'EHLO ' . gethostname());
-        
-        // STARTTLS
-        $resp = smtp_send_command($fp, 'STARTTLS');
-        stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);
-        
-        // EHLO again after TLS
-        $resp = smtp_send_command($fp, 'EHLO ' . gethostname());
-        
-        // AUTH LOGIN
-        $resp = smtp_send_command($fp, 'AUTH LOGIN');
-        $resp = smtp_send_command($fp, base64_encode($username));
-        $resp = smtp_send_command($fp, base64_encode($password));
-        
-        // Check authentication
-        if (strpos($resp, '235') === false) {
-            fclose($fp);
-            return ['success' => false, 'message' => 'SMTP authentication failed'];
+        // Read all EHLO responses
+        while (substr($response, 3, 1) == '-') {
+            $response = fgets($socket, 1024);
         }
         
-        // Build email message
+        // Start TLS encryption
+        fputs($socket, "STARTTLS\r\n");
+        $response = fgets($socket, 1024);
+        
+        if (strpos($response, '220') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'STARTTLS not available'];
+        }
+        
+        // Enable TLS on the connection
+        if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'Failed to enable TLS encryption'];
+        }
+        
+        // Send EHLO again after TLS
+        fputs($socket, "EHLO localhost\r\n");
+        $response = fgets($socket, 1024);
+        
+        // Read all EHLO responses
+        while (substr($response, 3, 1) == '-') {
+            $response = fgets($socket, 1024);
+        }
+        
+        // Authenticate
+        fputs($socket, "AUTH LOGIN\r\n");
+        $response = fgets($socket, 1024);
+        
+        if (strpos($response, '334') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'AUTH LOGIN not available'];
+        }
+        
+        // Send username (base64 encoded)
+        fputs($socket, base64_encode($username) . "\r\n");
+        $response = fgets($socket, 1024);
+        
+        if (strpos($response, '334') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'Username rejected'];
+        }
+        
+        // Send password (base64 encoded)
+        fputs($socket, base64_encode($password) . "\r\n");
+        $response = fgets($socket, 1024);
+        
+        if (strpos($response, '235') === false) {
+            fclose($socket);
+            error_log("Gmail Auth Failed: $response");
+            return ['success' => false, 'message' => 'Authentication failed - check credentials'];
+        }
+        
+        // Now send email
+        fputs($socket, "MAIL FROM: <$from>\r\n");
+        $response = fgets($socket, 1024);
+        
+        fputs($socket, "RCPT TO: <$email>\r\n");
+        $response = fgets($socket, 1024);
+        
+        if (strpos($response, '250') === false) {
+            fclose($socket);
+            return ['success' => false, 'message' => 'Recipient rejected'];
+        }
+        
+        // Send message data
+        fputs($socket, "DATA\r\n");
+        $response = fgets($socket, 1024);
+        
         $subject = 'Your OTP Code - Question Bank System';
-        $body = "
-<html>
-<head><style>body { font-family: Arial, sans-serif; }</style></head>
-<body>
-    <h2>Your One-Time Password (OTP)</h2>
-    <p>Your OTP code is:</p>
-    <h1 style=\"color: #007bff; letter-spacing: 5px;\">$otp</h1>
-    <p>This code will expire in " . OTP_EXPIRY_MINUTES . " minutes.</p>
-    <p>If you did not request this code, please ignore this email.</p>
-    <hr>
-    <p><small>Question Bank System - Secure Login</small></p>
-</body>
-</html>
-        ";
+        $body = "Your OTP code is: $otp\n\nThis code will expire in " . OTP_EXPIRY_MINUTES . " minutes.\n\nIf you did not request this, ignore this email.";
         
-        // Prepare headers
-        $headers = "From: $from\r\n";
-        $headers .= "To: $email\r\n";
-        $headers .= "Subject: $subject\r\n";
-        $headers .= "MIME-Version: 1.0\r\n";
-        $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+        $message = "From: $from\r\n";
+        $message .= "To: $email\r\n";
+        $message .= "Subject: $subject\r\n";
+        $message .= "MIME-Version: 1.0\r\n";
+        $message .= "Content-type: text/plain; charset=UTF-8\r\n";
+        $message .= "\r\n";
+        $message .= $body;
+        $message .= "\r\n.\r\n";
         
-        // MAIL FROM
-        smtp_send_command($fp, "MAIL FROM: <$from>");
+        fputs($socket, $message);
+        $response = fgets($socket, 1024);
         
-        // RCPT TO
-        $resp = smtp_send_command($fp, "RCPT TO: <$email>");
-        if (strpos($resp, '250') === false && strpos($resp, '251') === false) {
-            fclose($fp);
-            return ['success' => false, 'message' => 'RCPT TO failed'];
-        }
+        // Close connection
+        fputs($socket, "QUIT\r\n");
+        fclose($socket);
         
-        // DATA
-        smtp_send_command($fp, 'DATA');
-        
-        // Send message
-        $messageBody = "From: $from\r\n";
-        $messageBody .= "To: $email\r\n";
-        $messageBody .= "Subject: $subject\r\n";
-        $messageBody .= "MIME-Version: 1.0\r\n";
-        $messageBody .= "Content-type: text/html; charset=UTF-8\r\n";
-        $messageBody .= "\r\n";
-        $messageBody .= $body;
-        $messageBody .= "\r\n.\r\n";
-        
-        fputs($fp, $messageBody);
-        $resp = fgets($fp, 1024);
-        
-        // QUIT
-        smtp_send_command($fp, 'QUIT');
-        fclose($fp);
-        
-        if (strpos($resp, '250') !== false) {
+        if (strpos($response, '250') !== false) {
             return ['success' => true, 'message' => 'OTP sent to your email'];
         } else {
-            return ['success' => false, 'message' => 'Failed to send email'];
+            return ['success' => false, 'message' => 'Failed to queue email for sending'];
         }
         
     } catch (Exception $e) {
         error_log('SMTP error: ' . $e->getMessage());
-        return ['success' => false, 'message' => 'Email service error'];
+        return ['success' => false, 'message' => 'Email service error: ' . $e->getMessage()];
     }
 }
 
