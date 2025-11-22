@@ -1,4 +1,7 @@
 <?php
+// Start output buffering to allow header redirects
+ob_start();
+
 require_once 'db.php';
 require_once 'student_auth.php';
 require_once 'otp_config.php';
@@ -154,7 +157,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_SESSION['register_step'])) {
     $step = $_SESSION['register_step'];
 }
-?>
+
+// Handle resend OTP via GET (from link click)
+if (isset($_GET['action']) && $_GET['action'] === 'resend_otp') {
+    if (!isset($_SESSION['register_email'])) {
+        $error = 'Session expired. Please register again.';
+        session_unset();
+        $step = 1;
+    } else {
+        $email = $_SESSION['register_email'];
+        $otp = generate_otp();
+        store_otp_in_db($email, $otp);
+        $result = send_otp_email($email, $otp);
+        
+        if ($result['success']) {
+            $message = 'New OTP sent to your email.';
+            $step = 2;
+        } else {
+            $error = $result['message'];
+        }
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -238,12 +261,12 @@ if (isset($_SESSION['register_step'])) {
             </div>
             
             <div class="text-center">
-              <form method="post" class="d-inline">
-                <input type="hidden" name="action" value="resend_otp">
-                <button type="submit" class="btn btn-link btn-sm">Didn't receive? Resend OTP</button>
-              </form>
-              <br>
-              <a href="student_register.php" class="btn btn-link btn-sm">← Back to Registration</a>
+              <p class="text-muted mb-2">
+                <a href="student_register.php?action=resend_otp" class="btn btn-link btn-sm">Didn't receive? Resend OTP</a>
+              </p>
+              <p class="text-muted">
+                <a href="student_register.php" class="btn btn-link btn-sm">← Back to Registration</a>
+              </p>
             </div>
           </form>
           <?php endif; ?>
