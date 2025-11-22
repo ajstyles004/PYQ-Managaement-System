@@ -17,6 +17,15 @@ The system features both a **student interface** and an **admin management panel
 
 ## Features
 
+### Email + OTP Authentication System (NEW)
+- **Two-Factor Authentication:** Secure login with email verification via OTP (One-Time Password)
+- **Email-Based Login:** Students login using email address instead of username
+- **OTP Verification:** 6-digit codes sent to registered email, valid for 10 minutes
+- **Account Verification:** New registrations require email verification before access
+- **Real Email Sending:** Integrated with Gmail SMTP for reliable OTP delivery
+- **Session Security:** Sessions regenerated after login to prevent fixation attacks
+- **Password Hashing:** Bcrypt hashing (PASSWORD_DEFAULT) for all stored passwords
+
 ### Role-Based Access Control
 - **Student Account** - Register/login to view and download papers (read-only access)
 - **Admin Account** - Manage all content and system administration
@@ -34,8 +43,8 @@ The system features both a **student interface** and an **admin management panel
 
 ### Authentication Pages
 - **choose_role.php** - Landing page to select Student or Admin role
-- **student_login.php** - Student login with redirect support
-- **student_register.php** - New student registration
+- **student_login.php** - Student login with email + password + OTP verification
+- **student_register.php** - New student registration with email verification
 - **student_profile.php** - View/manage student profile
 - **admin_login.php** - Admin login with redirect support
 - **admin_logout.php** - Logout endpoint
@@ -111,6 +120,41 @@ $DB_USER = 'root';           // MySQL username
 $DB_PASS = '';               // MySQL password (empty if none)
 ```
 
+### Step 4b: Configure Email + OTP (NEW)
+To enable real email delivery for OTP verification:
+
+1. Edit `otp_config.php`:
+```php
+define('SMTP_HOST', 'smtp.gmail.com');
+define('SMTP_PORT', 587);
+define('SMTP_USERNAME', 'your-email@gmail.com');
+define('SMTP_PASSWORD', 'your-app-password');  // Use Gmail App Password, not regular password
+define('SENDER_EMAIL', 'your-email@gmail.com');
+define('SENDER_NAME', 'Question Bank');
+define('ENABLE_EMAIL_OTP', true);
+define('OTP_EXPIRY_MINUTES', 10);
+define('OTP_LENGTH', 6);
+```
+
+2. **For Gmail:**
+   - Enable 2-Step Verification on your Google Account
+   - Go to https://myaccount.google.com/apppasswords
+   - Generate an "App Password" for Mail
+   - Use this app password in `SMTP_PASSWORD` (not your regular Gmail password)
+
+3. **Alternative - Using SendGrid:**
+   - Sign up for free account at https://sendgrid.com/
+   - Replace SMTP_HOST with 'smtp.sendgrid.net' and SMTP_USERNAME with 'apikey'
+   - Use your API key as SMTP_PASSWORD
+
+4. **Test Email Sending:**
+   - Go to `http://localhost/question_bank/student_register.php`
+   - Register a test account with your email
+   - You should receive an OTP email within 10 seconds
+   - Complete registration by entering the OTP
+
+For detailed setup instructions, see `EMAIL_OTP_SETUP.md`
+
 ### Step 5: Launch Application
 Open your browser and go to:
 ```
@@ -125,8 +169,8 @@ This will take you to the role selection page where you can choose to login as a
 ```
 question_bank/
 ├── choose_role.php        # Role selection landing page
-├── student_login.php      # Student login page
-├── student_register.php   # Student registration page
+├── student_login.php      # Student login page (email + password + OTP)
+├── student_register.php   # Student registration with email verification
 ├── student_dashboard.php  # Student search & download interface
 ├── student_profile.php    # Student profile page
 ├── student_auth.php       # Student session helpers
@@ -139,6 +183,8 @@ question_bank/
 ├── manage.php             # Admin panel (departments, subjects, papers)
 ├── index.php              # Public search interface (legacy)
 ├── db.php                 # Database connection configuration
+├── otp_config.php         # Email and OTP configuration (NEW)
+├── migrate_to_email_otp.php # Database migration tool for email login (NEW)
 ├── api_list.php           # API for searching papers
 ├── paper_api.php          # API for paper CRUD operations
 ├── subject_api.php        # API for subject CRUD operations
@@ -152,6 +198,7 @@ question_bank/
 ├── css/
 │   └── style.css          # Custom styles
 ├── uploads/               # Uploaded PDF files (must be writable)
+├── EMAIL_OTP_SETUP.md     # Email + OTP setup guide (NEW)
 └── README.md              # This file
 ```
 
@@ -360,12 +407,37 @@ Response: JSON array of departments
 - **Access Control:** Students can only view papers, cannot modify content
 
 ### Authentication Flow
-1. User selects role (Student/Admin) on `choose_role.php`
-2. Redirects to login page (`student_login.php` or `admin_login.php`)
-3. Credentials verified against database
+
+**Student Login (with Email + OTP):**
+1. User selects "I am a Student" on `choose_role.php`
+2. Redirected to `student_login.php`
+3. New user: Click **Register** on `student_register.php`
+   - Enter email and password
+   - Account created as unverified
+   - 6-digit OTP sent to registered email
+   - Enter OTP within 10 minutes to verify account
+   - Redirected to student_login.php for login
+4. Existing user: Enter email + password on login page
+   - Password verified against bcrypt hash
+   - 6-digit OTP generated and sent via Gmail SMTP
+   - Enter OTP to complete authentication
+5. Session established with regenerated ID (session_regenerate_id(true))
+6. User redirected to student_dashboard.php
+
+**Admin Login:**
+1. User selects "I am an Admin" on `choose_role.php`
+2. Redirected to `admin_login.php`
+3. Credentials verified against admin_user table
 4. Session established with regenerated ID
-5. User redirected to dashboard/panel or original requested page
-6. Protected pages check session before allowing access
+5. User redirected to manage.php or requested page
+6. Protected pages check admin session before allowing access
+
+**OTP Security Details:**
+- OTP Format: 6 random digits (zero-padded)
+- Expiry: 10 minutes (configurable in otp_config.php)
+- Transport: Sent via Gmail SMTP with TLS encryption
+- Storage: Stored in student_user.otp_code with expiration timestamp
+- Verification: Checked against database, compared with expiry time
 
 ### Production Recommendations
 
@@ -417,6 +489,33 @@ For production deployment, consider:
   - Verify file exists in `uploads/` folder
   - Check `download.php` file permissions
   - Ensure PDF is valid (not corrupted during upload)
+
+#### 6. **OTP Email Not Received (NEW)**
+- **Error:** "Failed to send OTP email" message or OTP takes too long to arrive
+- **Solution:**
+  - Verify `otp_config.php` has correct Gmail credentials
+  - Ensure Gmail App Password is used (not regular password)
+  - Check Gmail account has 2-Step Verification enabled
+  - Verify `ENABLE_EMAIL_OTP` is set to `true` in `otp_config.php`
+  - Check spam/junk folder in email
+  - Wait at least 10 seconds after clicking "Send OTP"
+  - Check Apache error log: `C:\xampp\apache\logs\error.log` (Windows)
+
+#### 7. **OTP Code Invalid or Expired (NEW)**
+- **Error:** "Invalid OTP code" or "OTP has expired"
+- **Solution:**
+  - Ensure you enter the full 6-digit code (leading zeros matter)
+  - OTP is valid for 10 minutes from generation - don't wait too long
+  - Click **Resend OTP** if expired to get a new code
+  - Try logging out and logging back in to reset OTP
+
+#### 8. **Student Registration Fails (NEW)**
+- **Error:** "Failed to create account" or redirect loop on registration
+- **Solution:**
+  - Verify email doesn't already exist in database
+  - Check password is at least 6 characters
+  - Ensure `migrate_to_email_otp.php` has been run to add email columns
+  - Check MySQL error log for database issues
 
 ---
 
@@ -475,6 +574,14 @@ For issues or feature requests:
 
 - **v1.0** - Initial release with basic paper upload/download, department/subject management
 - **v1.1** - Added role-based authentication system with student and admin accounts, session management, and access control
+- **v1.2** - Implemented Email + OTP two-factor authentication system for enhanced security
+  - Email-based student login with 6-digit OTP verification
+  - Gmail SMTP integration for reliable email delivery
+  - Email verification on student registration
+  - Secure password hashing with bcrypt (PASSWORD_DEFAULT)
+  - Session regeneration after authentication
+  - Resend OTP functionality
+  - OTP expiry tracking with configurable timeout (default 10 minutes)
 
 ---
 
