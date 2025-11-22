@@ -92,8 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     } else {
                         $error = 'Registration failed. Please try again.';
+                        $stmt->close();
                     }
-                    $stmt->close();
                 } else {
                     $error = 'Database error: ' . $mysqli->error;
                 }

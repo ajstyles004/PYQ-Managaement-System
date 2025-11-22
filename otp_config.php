@@ -12,9 +12,9 @@ define('OTP_LENGTH', 6);            // 6-digit OTP
 // SMTP Configuration (update with your email service details)
 define('SMTP_HOST', 'smtp.gmail.com');
 define('SMTP_PORT', 587);
-define('SMTP_USERNAME', 'your-email@gmail.com');
-define('SMTP_PASSWORD', 'your-app-password');
-define('SENDER_EMAIL', 'your-email@gmail.com');
+define('SMTP_USERNAME', 'qbank0290@gmail.com');
+define('SMTP_PASSWORD', 'xwjm ayxq wzzp jobc');
+define('SENDER_EMAIL', 'qbank0290@gmail.com');
 define('SENDER_NAME', 'Question Bank System');
 
 /**
@@ -26,7 +26,7 @@ function generate_otp() {
 }
 
 /**
- * Send OTP to email using PHPMailer or file-based testing
+ * Send OTP to email using direct SMTP connection to Gmail
  * @param string $email Email address
  * @param string $otp OTP code to send
  * @return array ['success' => bool, 'message' => string]
@@ -41,86 +41,128 @@ function send_otp_email($email, $otp) {
         return ['success' => true, 'message' => 'OTP logged (development mode)'];
     }
     
-    // Real email mode: use PHPMailer
-    try {
-        if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
-            // PHPMailer not installed; fallback to mail()
-            return send_otp_via_php_mail($email, $otp);
-        }
-        
-        $mail = new PHPMailer\PHPMailer\PHPMailer();
-        $mail->isSMTP();
-        $mail->Host = SMTP_HOST;
-        $mail->Port = SMTP_PORT;
-        $mail->SMTPAuth = true;
-        $mail->Username = SMTP_USERNAME;
-        $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-        
-        $mail->From = SENDER_EMAIL;
-        $mail->FromName = SENDER_NAME;
-        $mail->addAddress($email);
-        
-        $mail->isHTML(true);
-        $mail->Subject = 'Your OTP Code - Question Bank System';
-        $mail->Body = '
-            <html>
-            <head><style>body { font-family: Arial, sans-serif; }</style></head>
-            <body>
-                <h2>Your One-Time Password (OTP)</h2>
-                <p>Your OTP code is:</p>
-                <h1 style="color: #007bff; letter-spacing: 5px;">' . htmlspecialchars($otp) . '</h1>
-                <p>This code will expire in ' . OTP_EXPIRY_MINUTES . ' minutes.</p>
-                <p>If you did not request this code, please ignore this email.</p>
-                <hr>
-                <p><small>Question Bank System - Secure Login</small></p>
-            </body>
-            </html>
-        ';
-        
-        if ($mail->send()) {
-            return ['success' => true, 'message' => 'OTP sent to your email'];
-        } else {
-            return ['success' => false, 'message' => 'Failed to send OTP: ' . $mail->ErrorInfo];
-        }
-    } catch (Exception $e) {
-        error_log('OTP email error: ' . $e->getMessage());
-        return ['success' => false, 'message' => 'Email service unavailable'];
-    }
+    // Try using PHP's SMTP stream context for Gmail
+    return send_otp_via_stream_socket($email, $otp);
 }
 
 /**
- * Fallback: send OTP using PHP's mail() function
- * @param string $email Email address
- * @param string $otp OTP code
- * @return array ['success' => bool, 'message' => string]
+ * Send email via direct SMTP stream socket connection
+ * This method works on Windows without needing mail() function
  */
-function send_otp_via_php_mail($email, $otp) {
-    $to = $email;
-    $subject = 'Your OTP Code - Question Bank System';
-    $headers = "MIME-Version: 1.0\r\n";
-    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: " . SENDER_EMAIL . "\r\n";
-    
-    $body = '
-        <html>
-        <head><style>body { font-family: Arial, sans-serif; }</style></head>
-        <body>
-            <h2>Your One-Time Password (OTP)</h2>
-            <p>Your OTP code is:</p>
-            <h1 style="color: #007bff; letter-spacing: 5px;">' . htmlspecialchars($otp) . '</h1>
-            <p>This code will expire in ' . OTP_EXPIRY_MINUTES . ' minutes.</p>
-            <p>If you did not request this code, please ignore this email.</p>
-            <hr>
-            <p><small>Question Bank System - Secure Login</small></p>
-        </body>
-        </html>
-    ';
-    
-    if (mail($to, $subject, $body, $headers)) {
-        return ['success' => true, 'message' => 'OTP sent to your email'];
-    } else {
-        return ['success' => false, 'message' => 'Failed to send OTP'];
+function send_otp_via_stream_socket($email, $otp) {
+    try {
+        $host = SMTP_HOST;
+        $port = SMTP_PORT;
+        $username = SMTP_USERNAME;
+        $password = SMTP_PASSWORD;
+        $from = SENDER_EMAIL;
+        $fromName = SENDER_NAME;
+        
+        // Create SMTP connection
+        $fp = @fsockopen('ssl://' . $host, $port, $errno, $errstr, 30);
+        
+        if (!$fp) {
+            // Try without SSL if SSL fails
+            $fp = @fsockopen($host, $port, $errno, $errstr, 30);
+            if (!$fp) {
+                return ['success' => false, 'message' => "Failed to connect to SMTP: $errstr"];
+            }
+        }
+        
+        // Helper function to send SMTP command
+        function smtp_send_command($fp, $cmd) {
+            fputs($fp, $cmd . "\r\n");
+            $response = fgets($fp, 1024);
+            return $response;
+        }
+        
+        // Read server greeting
+        $greeting = fgets($fp, 1024);
+        
+        // EHLO
+        $resp = smtp_send_command($fp, 'EHLO ' . gethostname());
+        
+        // STARTTLS
+        $resp = smtp_send_command($fp, 'STARTTLS');
+        stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT);
+        
+        // EHLO again after TLS
+        $resp = smtp_send_command($fp, 'EHLO ' . gethostname());
+        
+        // AUTH LOGIN
+        $resp = smtp_send_command($fp, 'AUTH LOGIN');
+        $resp = smtp_send_command($fp, base64_encode($username));
+        $resp = smtp_send_command($fp, base64_encode($password));
+        
+        // Check authentication
+        if (strpos($resp, '235') === false) {
+            fclose($fp);
+            return ['success' => false, 'message' => 'SMTP authentication failed'];
+        }
+        
+        // Build email message
+        $subject = 'Your OTP Code - Question Bank System';
+        $body = "
+<html>
+<head><style>body { font-family: Arial, sans-serif; }</style></head>
+<body>
+    <h2>Your One-Time Password (OTP)</h2>
+    <p>Your OTP code is:</p>
+    <h1 style=\"color: #007bff; letter-spacing: 5px;\">$otp</h1>
+    <p>This code will expire in " . OTP_EXPIRY_MINUTES . " minutes.</p>
+    <p>If you did not request this code, please ignore this email.</p>
+    <hr>
+    <p><small>Question Bank System - Secure Login</small></p>
+</body>
+</html>
+        ";
+        
+        // Prepare headers
+        $headers = "From: $from\r\n";
+        $headers .= "To: $email\r\n";
+        $headers .= "Subject: $subject\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-type: text/html; charset=UTF-8\r\n";
+        
+        // MAIL FROM
+        smtp_send_command($fp, "MAIL FROM: <$from>");
+        
+        // RCPT TO
+        $resp = smtp_send_command($fp, "RCPT TO: <$email>");
+        if (strpos($resp, '250') === false && strpos($resp, '251') === false) {
+            fclose($fp);
+            return ['success' => false, 'message' => 'RCPT TO failed'];
+        }
+        
+        // DATA
+        smtp_send_command($fp, 'DATA');
+        
+        // Send message
+        $messageBody = "From: $from\r\n";
+        $messageBody .= "To: $email\r\n";
+        $messageBody .= "Subject: $subject\r\n";
+        $messageBody .= "MIME-Version: 1.0\r\n";
+        $messageBody .= "Content-type: text/html; charset=UTF-8\r\n";
+        $messageBody .= "\r\n";
+        $messageBody .= $body;
+        $messageBody .= "\r\n.\r\n";
+        
+        fputs($fp, $messageBody);
+        $resp = fgets($fp, 1024);
+        
+        // QUIT
+        smtp_send_command($fp, 'QUIT');
+        fclose($fp);
+        
+        if (strpos($resp, '250') !== false) {
+            return ['success' => true, 'message' => 'OTP sent to your email'];
+        } else {
+            return ['success' => false, 'message' => 'Failed to send email'];
+        }
+        
+    } catch (Exception $e) {
+        error_log('SMTP error: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Email service error'];
     }
 }
 
