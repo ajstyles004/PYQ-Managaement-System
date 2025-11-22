@@ -121,6 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 unset($_SESSION['register_step'], $_SESSION['register_email'], $_SESSION['register_student_id']);
                 $message = 'Email verified! Your account is active. You can now login.';
                 $step = 3;  // Success step
+                
+                // Auto-redirect after 3 seconds
+                header('Refresh: 3; url=student_login.php');
             } else {
                 $error = $verify_result['message'];
             }
@@ -252,7 +255,15 @@ if (isset($_SESSION['register_step'])) {
             <div style="font-size: 3rem; color: #28a745; margin-bottom: 20px;">✓</div>
             <h4>Email Verified!</h4>
             <p>Your account is ready to use.</p>
-            <a href="student_login.php" class="btn btn-primary btn-lg">Go to Login</a>
+            <div class="alert alert-success mb-3">
+              <strong>Success!</strong> Redirecting to login page in 3 seconds...
+            </div>
+            <a href="student_login.php" class="btn btn-primary btn-lg">Go to Login Now</a>
+            <script>
+              setTimeout(function() {
+                window.location.href = 'student_login.php';
+              }, 3000);
+            </script>
           </div>
           <?php endif; ?>
           
