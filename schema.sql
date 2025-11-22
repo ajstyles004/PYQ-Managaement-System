@@ -80,8 +80,12 @@ CREATE TABLE IF NOT EXISTS admin_user (
 -- Students table for read-only student accounts
 CREATE TABLE IF NOT EXISTS student_user (
   student_id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(100) NOT NULL UNIQUE,
+  username VARCHAR(100) UNIQUE,
+  email VARCHAR(150) NOT NULL UNIQUE,
   full_name VARCHAR(150) DEFAULT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  otp_code VARCHAR(10) DEFAULT NULL,
+  otp_expires_at DATETIME DEFAULT NULL,
+  is_verified TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
