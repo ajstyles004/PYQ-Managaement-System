@@ -1,4 +1,7 @@
 <?php
+// Start output buffering to allow header redirects
+ob_start();
+
 require_once 'db.php';
 require_once 'student_auth.php';
 require_once 'otp_config.php';
@@ -124,6 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Clear login session data
                     unset($_SESSION['login_step'], $_SESSION['login_email'], $_SESSION['login_student_id']);
                     
+                    // Clear output buffer and redirect
+                    ob_end_clean();
                     header('Location: ' . $redirect);
                     exit;
                 }
@@ -158,6 +163,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_SESSION['login_step'])) {
     $step = $_SESSION['login_step'];
 }
+
+// Handle resend OTP via GET (from link click)
+if (isset($_GET['action']) && $_GET['action'] === 'resend_otp') {
+    if (!isset($_SESSION['login_email'])) {
+        $error = 'Session expired. Please start over.';
+        session_unset();
+        $step = 1;
+    } else {
+        $email = $_SESSION['login_email'];
+        $otp = generate_otp();
+        store_otp_in_db($email, $otp);
+        $result = send_otp_email($email, $otp);
+        
+        if ($result['success']) {
+            $message = 'New OTP sent to your email.';
+            $step = 2;
+        } else {
+            $error = $result['message'];
+        }
+    }
+    // Keep redirect parameter if provided
+    if (isset($_GET['redirect'])) {
+        $redirect = $_GET['redirect'];
+    }
+}
+
+// Close output buffering
+ob_end_clean();
 ?>
 <!doctype html>
 <html lang="en">
@@ -231,12 +264,12 @@ if (isset($_SESSION['login_step'])) {
             </div>
             
             <div class="text-center">
-              <form method="post" class="d-inline">
-                <input type="hidden" name="action" value="resend_otp">
-                <button type="submit" class="btn btn-link btn-sm">Didn't receive the code? Resend OTP</button>
-              </form>
-              <br>
-              <a href="student_login.php" class="btn btn-link btn-sm">← Back to Login</a>
+              <p class="text-muted mb-2">
+                <a href="student_login.php?action=resend_otp&redirect=<?php echo urlencode($redirect); ?>" class="btn btn-link btn-sm">Didn't receive the code? Resend OTP</a>
+              </p>
+              <p class="text-muted">
+                <a href="student_login.php?redirect=<?php echo urlencode($redirect); ?>" class="btn btn-link btn-sm">← Back to Login</a>
+              </p>
             </div>
           </form>
           <?php endif; ?>
